@@ -97,6 +97,7 @@ export default function EDAPage() {
               <SchemaCards
                 profiles={sessionData.profiles}
                 relationships={sessionData.relationships}
+                sessionId={sessionData.session_id}
               />
             )}
             {activeTab === "chat" && (
