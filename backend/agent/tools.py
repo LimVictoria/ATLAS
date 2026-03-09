@@ -176,9 +176,10 @@ def profile_table(session: DuckDBSession, table_name: str) -> dict:
             textfont={"size": 10},
             showscale=True,
         ))
+        corr_layout = {k: v for k, v in chart_layout.items() if k != "height"}
         fig_corr.update_layout(
             title="Correlation Matrix",
-            **chart_layout,
+            **corr_layout,
             height=max(220, len(numeric_cols) * 40 + 80),
         )
         profile["charts"]["correlation"] = json.dumps(fig_corr, cls=__import__("plotly.utils", fromlist=["PlotlyJSONEncoder"]).PlotlyJSONEncoder)
@@ -197,9 +198,10 @@ def profile_table(session: DuckDBSession, table_name: str) -> dict:
             showscale=False,
             zmin=0, zmax=1,
         ))
+        null_layout = {k: v for k, v in chart_layout.items() if k != "height"}
         fig_null.update_layout(
             title="Missing Value Map  (red = null)",
-            **chart_layout,
+            **null_layout,
             height=240,
             xaxis=dict(tickangle=-30),
         )
