@@ -21,9 +21,19 @@ app = FastAPI(
 # ── CORS ──────────────────────────────────────────────────────────────────────
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
+allowed_origins = [
+    "http://localhost:3000",
+    frontend_url,
+    "https://atlas-wine-iota.vercel.app",  # your Vercel deployment
+]
+
+# In development, allow all origins
+if os.getenv("ENVIRONMENT") != "production":
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url, "http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
