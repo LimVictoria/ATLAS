@@ -18,6 +18,20 @@ def _safe_sample(df, n: int = 5) -> list[dict]:
     return df.head(n).replace({float("nan"): None}).to_dict(orient="records")
 
 
+def _cardinality_label(unique: int, total: int, dtype: str) -> str:
+    """Classify a column based on cardinality and dtype."""
+    if "datetime" in dtype:
+        return "date"
+    if "float" in dtype or "int" in dtype:
+        return "numeric"
+    pct = unique / max(total, 1)
+    if pct > 0.95:
+        return "id"
+    if pct > 0.5:
+        return "freetext"
+    return "categorical"
+
+
 # ── Tool 1: Schema Loader ─────────────────────────────────────────────────────
 
 def get_all_schemas(session: DuckDBSession) -> dict:
@@ -40,7 +54,7 @@ def get_all_schemas(session: DuckDBSession) -> dict:
     return result
 
 
-# ── Tool 2: Data Quality Profile ──────────────────────────────────────────────
+# ── Tool 2: Rich Profile ──────────────────────────────────────────────────────
 
 def profile_table(session: DuckDBSession, table_name: str) -> dict:
     import pandas as pd
@@ -51,24 +65,41 @@ def profile_table(session: DuckDBSession, table_name: str) -> dict:
     if df is None:
         return {"error": f"Table {table_name} not found"}
 
+    total_rows = len(df)
+
     profile = {
         "table": table_name,
-        "row_count": len(df),
+        "row_count": total_rows,
         "column_count": len(df.columns),
         "duplicate_rows": int(df.duplicated().sum()),
         "columns": {},
+        "charts": {},
     }
+
+    numeric_cols = []
+    has_nulls = False
 
     for col in df.columns:
         series = df[col]
+        dtype_str = str(series.dtype)
+        unique_count = int(series.nunique())
+        null_pct = round(series.isnull().mean() * 100, 2)
+        if null_pct > 0:
+            has_nulls = True
+
+        cardinality = _cardinality_label(unique_count, total_rows, dtype_str)
+
         col_profile: dict[str, Any] = {
-            "dtype": str(series.dtype),
+            "dtype": dtype_str,
             "null_count": int(series.isnull().sum()),
-            "null_pct": round(series.isnull().mean() * 100, 2),
-            "unique_count": int(series.nunique()),
+            "null_pct": null_pct,
+            "unique_count": unique_count,
+            "cardinality": cardinality,
         }
 
-        if pd.api.types.is_numeric_dtype(series):
+        # Numeric
+        if cardinality == "numeric":
+            numeric_cols.append(col)
             clean = series.dropna()
             if len(clean) > 0:
                 z_scores = np.abs(stats.zscore(clean))
@@ -82,7 +113,17 @@ def profile_table(session: DuckDBSession, table_name: str) -> dict:
                     "outlier_count": outlier_count,
                     "outlier_pct": round(outlier_count / len(clean) * 100, 2),
                 })
-        elif pd.api.types.is_datetime64_any_dtype(series):
+
+        # Categorical — frequency bars
+        elif cardinality == "categorical":
+            counts = series.value_counts(normalize=True).head(8)
+            col_profile["frequencies"] = [
+                {"value": str(k), "pct": round(float(v) * 100, 1)}
+                for k, v in counts.items()
+            ]
+
+        # Date
+        elif cardinality == "date":
             clean = series.dropna()
             if len(clean) > 0:
                 col_profile.update({
@@ -90,11 +131,79 @@ def profile_table(session: DuckDBSession, table_name: str) -> dict:
                     "max_date": str(clean.max()),
                     "date_range_days": (clean.max() - clean.min()).days,
                 })
-        else:
-            top_values = series.value_counts().head(5).to_dict()
-            col_profile["top_values"] = {str(k): int(v) for k, v in top_values.items()}
 
         profile["columns"][col] = col_profile
+
+    # ── Auto chart — pick most interesting numeric column ─────────────────────
+    import plotly.express as px
+    import plotly.graph_objects as go
+
+    chart_layout = dict(
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#f8fafc",
+        font=dict(color="#0f172a", family="IBM Plex Sans, sans-serif", size=11),
+        margin=dict(t=36, r=16, b=48, l=52),
+        height=220,
+    )
+
+    if numeric_cols:
+        # Pick column with highest std (most interesting distribution)
+        best_col = max(
+            numeric_cols,
+            key=lambda c: df[c].std() if not pd.isna(df[c].std()) else 0
+        )
+        fig = px.histogram(
+            df, x=best_col,
+            title=f"Distribution — {best_col}",
+            color_discrete_sequence=["#0284c7"],
+            nbins=30,
+        )
+        fig.update_layout(**chart_layout)
+        fig.update_traces(marker_line_width=0)
+        profile["charts"]["auto"] = json.dumps(fig, cls=__import__("plotly.utils", fromlist=["PlotlyJSONEncoder"]).PlotlyJSONEncoder)
+
+    # ── Correlation heatmap ───────────────────────────────────────────────────
+    if len(numeric_cols) >= 2:
+        corr = df[numeric_cols].corr().round(2)
+        fig_corr = go.Figure(data=go.Heatmap(
+            z=corr.values.tolist(),
+            x=list(corr.columns),
+            y=list(corr.index),
+            colorscale="RdBu",
+            zmid=0, zmin=-1, zmax=1,
+            text=corr.values.round(2).tolist(),
+            texttemplate="%{text}",
+            textfont={"size": 10},
+            showscale=True,
+        ))
+        fig_corr.update_layout(
+            title="Correlation Matrix",
+            **chart_layout,
+            height=max(220, len(numeric_cols) * 40 + 80),
+        )
+        profile["charts"]["correlation"] = json.dumps(fig_corr, cls=__import__("plotly.utils", fromlist=["PlotlyJSONEncoder"]).PlotlyJSONEncoder)
+
+    # ── Null heatmap ──────────────────────────────────────────────────────────
+    if has_nulls:
+        # Sample up to 200 rows for visual
+        sample = df.isnull().astype(int)
+        if len(sample) > 200:
+            sample = sample.sample(200, random_state=42).reset_index(drop=True)
+
+        fig_null = go.Figure(data=go.Heatmap(
+            z=sample.values.tolist(),
+            x=list(sample.columns),
+            colorscale=[[0, "#f0fdf4"], [1, "#dc2626"]],
+            showscale=False,
+            zmin=0, zmax=1,
+        ))
+        fig_null.update_layout(
+            title="Missing Value Map  (red = null)",
+            **chart_layout,
+            height=240,
+            xaxis=dict(tickangle=-30),
+        )
+        profile["charts"]["nullmap"] = json.dumps(fig_null, cls=__import__("plotly.utils", fromlist=["PlotlyJSONEncoder"]).PlotlyJSONEncoder)
 
     return profile
 
@@ -149,7 +258,6 @@ def detect_anomalies(session: DuckDBSession, table_name: str) -> dict:
         return {"error": f"Table {table_name} not found"}
 
     anomalies = []
-
     for col in df.columns:
         series = df[col].dropna()
         if pd.api.types.is_numeric_dtype(series) and len(series) > 10:
@@ -174,20 +282,6 @@ def detect_anomalies(session: DuckDBSession, table_name: str) -> dict:
                         "message": f"{col} should not be negative",
                     })
 
-        if pd.api.types.is_datetime64_any_dtype(series) and len(series) > 10:
-            sorted_dates = series.sort_values()
-            gaps = sorted_dates.diff().dropna()
-            median_gap = gaps.median()
-            large_gaps = gaps[gaps > median_gap * 10]
-            if len(large_gaps) > 0:
-                anomalies.append({
-                    "type": "date_gap",
-                    "column": col,
-                    "count": len(large_gaps),
-                    "message": f"Unusual gaps found in {col}",
-                    "gap_dates": [str(d) for d in sorted_dates[large_gaps.index].tolist()[:5]],
-                })
-
     return {"table": table_name, "anomaly_count": len(anomalies), "anomalies": anomalies}
 
 
@@ -197,7 +291,6 @@ def generate_chart(session: DuckDBSession, table_name: str, chart_type: str,
                    x_col: str, y_col: str = None, color_col: str = None) -> str:
     import numpy as np
     import plotly.express as px
-    import plotly.graph_objects as go
 
     df = session.tables.get(table_name)
     if df is None:
@@ -228,11 +321,7 @@ def generate_chart(session: DuckDBSession, table_name: str, chart_type: str,
         else:
             return json.dumps({"error": f"Unknown chart type: {chart_type}"})
 
-        fig.update_layout(
-            paper_bgcolor="#ffffff",
-            plot_bgcolor="#f8fafc",
-            font_color="#0f172a",
-        )
+        fig.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#f8fafc", font_color="#0f172a")
         return _df_to_plotly_json(fig)
 
     except Exception as e:
@@ -304,26 +393,21 @@ def suggest_metrics(session: DuckDBSession) -> dict:
         if date_cols and amount_cols:
             dc, ac = date_cols[0], amount_cols[0]
             suggestions.append({
-                "metric": f"YoY {ac} Growth",
-                "table": table,
+                "metric": f"YoY {ac} Growth", "table": table,
                 "description": f"Year-over-year growth rate for {ac}",
                 "sql": f"SELECT YEAR({dc}) AS year, SUM({ac}) AS total_{ac} FROM {table} GROUP BY year ORDER BY year",
             })
-
         if status_cols and amount_cols:
             sc, ac = status_cols[0], amount_cols[0]
             suggestions.append({
-                "metric": f"{ac} by {sc}",
-                "table": table,
+                "metric": f"{ac} by {sc}", "table": table,
                 "description": f"Total {ac} broken down by {sc}",
                 "sql": f"SELECT {sc}, SUM({ac}) AS total_{ac}, COUNT(*) AS count FROM {table} GROUP BY {sc} ORDER BY total_{ac} DESC",
             })
-
         if geo_cols and amount_cols:
             gc, ac = geo_cols[0], amount_cols[0]
             suggestions.append({
-                "metric": f"{ac} by {gc}",
-                "table": table,
+                "metric": f"{ac} by {gc}", "table": table,
                 "description": f"Performance breakdown by {gc}",
                 "sql": f"SELECT {gc}, SUM({ac}) AS total_{ac}, AVG({ac}) AS avg_{ac} FROM {table} GROUP BY {gc} ORDER BY total_{ac} DESC",
             })
