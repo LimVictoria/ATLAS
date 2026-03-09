@@ -765,3 +765,97 @@ body {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; color: var(--muted);
 }
+
+/* ── Clickable column hints ──────────────────────────────────────────────── */
+
+.col-chart-hint {
+  opacity: 0; margin-left: 5px; color: var(--accent);
+  transition: opacity 0.2s; vertical-align: middle;
+}
+.col-row--expandable:hover .col-chart-hint { opacity: 1; }
+.col-row--selected td { background: rgba(2,132,199,0.05) !important; }
+.col-chevron { color: var(--muted); }
+
+.th-hint {
+  font-weight: 400; font-size: 9px; color: var(--muted);
+  margin-left: 4px; letter-spacing: 0; text-transform: none;
+}
+
+/* ── Inline freq rows ────────────────────────────────────────────────────── */
+
+.col-freq-row td {
+  padding: 4px 16px 8px !important;
+  border-bottom: 1px solid var(--border);
+  background: #fafbff;
+}
+
+/* ── Chart area ──────────────────────────────────────────────────────────── */
+
+.chart-loading {
+  display: flex; align-items: center; gap: 8px;
+  padding: 20px 16px; font-size: 12px; color: var(--muted);
+}
+
+.chart-col-label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 16px; font-size: 11px; color: var(--muted);
+  background: var(--surface2); border-bottom: 1px solid var(--border);
+}
+
+.chart-col-label strong { color: var(--accent); }
+
+.chart-reset-btn {
+  margin-left: auto; background: none; border: none;
+  font-size: 11px; color: var(--muted); cursor: pointer;
+  text-decoration: underline;
+}
+.chart-reset-btn:hover { color: var(--accent); }
+
+.chart-empty {
+  padding: 16px; font-size: 12px; color: var(--muted);
+  text-align: center; font-style: italic;
+}
+
+/* ── Heatmap na note ─────────────────────────────────────────────────────── */
+
+.heatmap-na {
+  font-size: 11px; color: var(--muted); font-family: var(--font-mono);
+  padding: 2px 0;
+}
+
+/* ── Cardinality legend ──────────────────────────────────────────────────── */
+
+.legend-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+
+.legend-toggle {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; background: none; border: none;
+  padding: 10px 16px; font-size: 12px; color: var(--muted);
+  cursor: pointer; text-align: left;
+  transition: color 0.2s, background 0.2s;
+}
+.legend-toggle:hover { color: var(--text); background: var(--surface2); }
+
+.legend-grid {
+  padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;
+  border-top: 1px solid var(--border); background: #fafbfc;
+}
+
+.legend-item {
+  display: flex; align-items: center; gap: 10px; font-size: 12px;
+}
+
+.legend-tip { color: var(--muted); }
+
+.legend-rules {
+  font-size: 11px; color: var(--muted); margin-top: 4px;
+  padding-top: 8px; border-top: 1px solid var(--border);
+}
+.legend-rules strong { color: var(--text); display: block; margin-bottom: 4px; }
+.legend-rules ul { padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
+
+/* ── Outlier note ────────────────────────────────────────────────────────── */
+.outlier-note { color: var(--accent4); font-size: 11px; }
