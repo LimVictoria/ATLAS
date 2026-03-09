@@ -19,22 +19,11 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-
-allowed_origins = [
-    "http://localhost:3000",
-    frontend_url,
-    "https://atlas-wine-iota.vercel.app",  # your Vercel deployment
-]
-
-# In development, allow all origins
-if os.getenv("ENVIRONMENT") != "production":
-    allowed_origins = ["*"]
-
+# Allow all origins for now — tighten after confirmed working
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -44,7 +33,6 @@ app.include_router(upload_router)
 app.include_router(chat_router)
 
 
-# ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "ATLAS Backend"}
