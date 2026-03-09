@@ -625,3 +625,116 @@ body {
   border-radius: 6px; padding: 6px 12px;
   font-family: var(--font-mono);
 }
+
+/* ── Cardinality badge ───────────────────────────────────────────────────── */
+
+.cardinality-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  padding: 2px 8px; border-radius: 99px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Expandable column row ───────────────────────────────────────────────── */
+
+.col-row--expandable { cursor: pointer; }
+.col-row--expandable:hover td { background: #f0f7ff !important; }
+
+.col-extra {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--muted);
+}
+
+.col-stat {
+  font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+}
+
+.expand-icon { color: var(--muted); display: flex; align-items: center; margin-left: auto; }
+
+/* ── Column detail (expanded) ────────────────────────────────────────────── */
+
+.col-detail-row td { padding: 0 !important; border-bottom: 1px solid var(--border) !important; }
+
+.col-detail {
+  padding: 12px 16px;
+  background: #f8faff;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Frequency bars ──────────────────────────────────────────────────────── */
+
+.freq-list { display: flex; flex-direction: column; gap: 5px; }
+
+.freq-row {
+  display: flex; align-items: center; gap: 8px; font-size: 11px;
+}
+
+.freq-label {
+  width: 120px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; color: var(--text); font-family: var(--font-mono);
+  font-size: 10px; flex-shrink: 0;
+}
+
+.freq-bar-wrap {
+  flex: 1; height: 10px; background: var(--surface2);
+  border-radius: 99px; overflow: hidden;
+}
+
+.freq-bar {
+  height: 100%; background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.freq-pct {
+  width: 36px; text-align: right; color: var(--muted);
+  font-family: var(--font-mono); font-size: 10px; flex-shrink: 0;
+}
+
+/* ── Numeric stats row ───────────────────────────────────────────────────── */
+
+.num-stats {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  font-size: 11px; color: var(--muted);
+  margin-top: 8px;
+}
+
+.num-stats strong { color: var(--text); }
+
+/* ── Chart section ───────────────────────────────────────────────────────── */
+
+.chart-section {
+  border-top: 1px solid var(--border);
+  padding: 4px 0 0;
+}
+
+/* ── Heatmap toggles ─────────────────────────────────────────────────────── */
+
+.heatmap-toggles {
+  display: flex; gap: 8px; padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.heatmap-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 12px;
+  font-size: 11px; color: var(--muted); cursor: pointer;
+  font-family: var(--font-mono);
+  transition: all 0.2s;
+}
+
+.heatmap-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.heatmap-btn--active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(2, 132, 199, 0.05);
+}
+
+/* ── Relationship join hint ──────────────────────────────────────────────── */
+
+.rel-join {
+  font-family: var(--font-mono); font-size: 9px; color: var(--muted);
+  margin-left: auto;
+}
