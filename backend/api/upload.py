@@ -1,8 +1,7 @@
 """
 ATLAS EDA — File Upload API
 Handles single file or folder (multiple files) upload.
-Registers all files into a DuckDB session.
-Returns immediate schema profile.
+Supports adding more files to an existing session.
 """
 
 import uuid
@@ -18,10 +17,8 @@ router = APIRouter(prefix="/upload", tags=["upload"])
 
 
 def _read_file(file: UploadFile) -> pd.DataFrame:
-    """Read uploaded file into DataFrame regardless of format."""
     filename = file.filename.lower()
     content = file.file.read()
-
     if filename.endswith(".csv"):
         return pd.read_csv(io.BytesIO(content))
     elif filename.endswith((".xlsx", ".xls")):
@@ -35,7 +32,6 @@ def _read_file(file: UploadFile) -> pd.DataFrame:
 
 
 def _infer_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Try to parse columns that look like dates."""
     for col in df.columns:
         if df[col].dtype == object:
             if any(k in col.lower() for k in ["date", "time", "created", "updated", "timestamp"]):
@@ -46,28 +42,16 @@ def _infer_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-@router.post("/")
-async def upload_files(files: List[UploadFile] = File(...)):
-    """
-    Upload one or more files.
-    Creates a new DuckDB session and registers all files as tables.
-    Returns session_id + immediate schema profile for all tables.
-    """
-    if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
-
-    session_id = str(uuid.uuid4())
-    session = create_session(session_id)
-
-    registered_tables = []
+def _process_files(files: List[UploadFile], session):
+    """Register files into a session, return results."""
+    registered = []
     errors = []
-
     for file in files:
         try:
             df = _read_file(file)
             df = _infer_datetime_columns(df)
             table_name = session.register_table(file.filename, df)
-            registered_tables.append({
+            registered.append({
                 "original_filename": file.filename,
                 "table_name": table_name,
                 "row_count": len(df),
@@ -75,38 +59,77 @@ async def upload_files(files: List[UploadFile] = File(...)):
             })
         except Exception as e:
             errors.append({"filename": file.filename, "error": str(e)})
+    return registered, errors
 
-    if not registered_tables:
+
+@router.post("/")
+async def upload_files(files: List[UploadFile] = File(...)):
+    """
+    Initial upload — creates a new session and registers all files.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    session_id = str(uuid.uuid4())
+    session = create_session(session_id)
+
+    registered, errors = _process_files(files, session)
+
+    if not registered:
         delete_session(session_id)
         raise HTTPException(status_code=400, detail=f"No files could be processed: {errors}")
 
-    # Generate immediate profile for all tables
     schemas = get_all_schemas(session)
-
-    # Detect relationships if multiple tables
-    relationships = None
-    if len(registered_tables) > 1:
-        relationships = detect_relationships(session)
-
-    # Generate per-table quality profile
-    profiles = {}
-    for item in registered_tables:
-        profiles[item["table_name"]] = profile_table(session, item["table_name"])
+    relationships = detect_relationships(session) if len(registered) > 1 else None
+    profiles = {item["table_name"]: profile_table(session, item["table_name"]) for item in registered}
 
     return {
         "session_id": session_id,
-        "tables": registered_tables,
+        "tables": registered,
         "errors": errors,
         "schemas": schemas,
         "profiles": profiles,
         "relationships": relationships,
-        "message": f"Successfully loaded {len(registered_tables)} table(s)",
+        "message": f"Successfully loaded {len(registered)} table(s)",
+    }
+
+
+@router.post("/{session_id}/add")
+async def add_files(session_id: str, files: List[UploadFile] = File(...)):
+    """
+    Add more files to an existing session without losing current tables or chat history.
+    """
+    session = get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found. Please start a new session.")
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    registered, errors = _process_files(files, session)
+
+    if not registered:
+        raise HTTPException(status_code=400, detail=f"No files could be processed: {errors}")
+
+    # Re-profile all tables including new ones
+    schemas = get_all_schemas(session)
+    relationships = detect_relationships(session) if len(session.list_tables()) > 1 else None
+    new_profiles = {item["table_name"]: profile_table(session, item["table_name"]) for item in registered}
+
+    return {
+        "session_id": session_id,
+        "new_tables": registered,
+        "all_tables": session.list_tables(),
+        "errors": errors,
+        "schemas": schemas,
+        "new_profiles": new_profiles,
+        "relationships": relationships,
+        "message": f"Added {len(registered)} new table(s) to session",
     }
 
 
 @router.delete("/{session_id}")
 async def close_session(session_id: str):
-    """Clean up a DuckDB session when user is done."""
     session = get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -116,7 +139,6 @@ async def close_session(session_id: str):
 
 @router.get("/{session_id}/tables")
 async def list_tables(session_id: str):
-    """List all tables in a session."""
     session = get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
