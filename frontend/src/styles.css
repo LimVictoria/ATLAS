@@ -555,3 +555,73 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Chat toolbar ────────────────────────────────────────────────────────── */
+
+.chat-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+
+.chat-tool-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px;
+  font-size: 11px; color: var(--muted); cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.chat-tool-btn:hover { color: var(--accent5); border-color: var(--accent5); }
+
+/* ── Add files button ────────────────────────────────────────────────────── */
+
+.add-files-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 12px;
+  font-size: 11px; color: var(--accent); cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  font-weight: 600;
+}
+
+.add-files-btn:hover {
+  background: rgba(2, 132, 199, 0.06);
+  border-color: var(--accent);
+}
+
+.add-files-zone {
+  display: flex; align-items: center; gap: 8px; flex: 1;
+}
+
+.add-dropzone {
+  flex: 1; border: 1px dashed var(--border); border-radius: 6px;
+  padding: 7px 14px; font-size: 12px; color: var(--muted);
+  cursor: pointer; text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.add-dropzone:hover,
+.add-dropzone--active {
+  border-color: var(--accent);
+  background: rgba(2, 132, 199, 0.04);
+  color: var(--accent);
+}
+
+.add-files-cancel {
+  background: none; border: none; font-size: 11px;
+  color: var(--muted); cursor: pointer;
+  padding: 4px 8px;
+}
+
+.add-files-cancel:hover { color: var(--text); }
+
+/* ── System message ──────────────────────────────────────────────────────── */
+
+.msg-system {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--accent3);
+  background: rgba(5, 150, 105, 0.06);
+  border: 1px solid rgba(5, 150, 105, 0.2);
+  border-radius: 6px; padding: 6px 12px;
+  font-family: var(--font-mono);
+}
