@@ -2,15 +2,24 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000",
-  timeout: 120000, // 2 min — agent runs can take time
+  timeout: 120000,
 });
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 
 export const uploadFiles = async (files) => {
   const formData = new FormData();
-  files.forEach((file) => formData.append("files", file));
+  files.forEach((f) => formData.append("files", f));
   const response = await api.post("/upload/", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};
+
+export const addFilesToSession = async (sessionId, files) => {
+  const formData = new FormData();
+  files.forEach((f) => formData.append("files", f));
+  const response = await api.post(`/upload/${sessionId}/add`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data;
@@ -23,11 +32,17 @@ export const closeSession = async (sessionId) => {
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 export const sendChat = async (sessionId, prompt) => {
-  const response = await api.post("/chat/", {
-    session_id: sessionId,
-    prompt,
-  });
+  const response = await api.post("/chat/", { session_id: sessionId, prompt });
   return response.data;
+};
+
+export const getChatHistory = async (sessionId) => {
+  const response = await api.get(`/chat/history/${sessionId}`);
+  return response.data;
+};
+
+export const clearChatHistory = async (sessionId) => {
+  await api.delete(`/chat/history/${sessionId}`);
 };
 
 export const generateChart = async (sessionId, tableN, chartType, xCol, yCol, colorCol) => {
