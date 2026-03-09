@@ -69,3 +69,9 @@ export const getSchema = async (sessionId) => {
 };
 
 export default api;
+
+export const getTableCharts = async (sessionId, tableName, col = null) => {
+  const params = col ? `?col=${encodeURIComponent(col)}` : "";
+  const response = await api.get(`/upload/${sessionId}/charts/${tableName}${params}`);
+  return response.data;
+};
